@@ -111,7 +111,7 @@ $("rat").onclick=e=>{
 setInterval(render,1000);
 
 let ui=null;
-try{ui=new TON_CONNECT_UI.TonConnectUI({manifestUrl:location.origin+"/tonconnect-manifest.json",buttonRootId:"ton"});
+try{ui=new TON_CONNECT_UI.TonConnectUI({manifestUrl:new URL("tonconnect-manifest.json",location.href).href,buttonRootId:"ton"});
  ui.onStatusChange(w=>{$("ws").textContent=w?"Connected":"Not connected"})}catch(e){}
 $("buy").onclick=async()=>{
  if(!ui?.connected){tg?.showAlert?.("Connect your wallet first.");document.querySelectorAll("#nav button")[3].click();return}
