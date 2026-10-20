@@ -129,7 +129,11 @@ $("buy").onclick=async()=>{
 };
 
 const link=`https://t.me/${BOT}?start=ref_${uid}`;
-$("inv").onclick=()=>{const u="https://t.me/share/url?url="+encodeURIComponent(link)+"&text="+encodeURIComponent("Tap RAT and earn RATCOIN!");tg?tg.openTelegramLink(u):window.open(u)};
+$("inv").onclick=()=>{
+ const txt=" RATCOIN: tap-to-mine on TON!\n⏱ 1000 taps per round, a new round every 45 minutes\n⚡ Level up with TON to boost your rewards\n🎁 Get 15 RAT free when you join\n\nJoin with my link 👇";
+ const u="https://t.me/share/url?url="+encodeURIComponent(link)+"&text="+encodeURIComponent(txt);
+ tg?tg.openTelegramLink(u):window.open(u);
+};
 $("cp").onclick=()=>{navigator.clipboard?.writeText(link);tg?.showAlert?.("Link copied.")};
 render();
 </script></body></html>
