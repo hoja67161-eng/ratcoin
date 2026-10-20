@@ -6,52 +6,54 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <script src="https://unpkg.com/@tonconnect/ui@2.0.9/dist/tonconnect-ui.min.js"></script>
 <style>
-:root{--bg:#06070c;--card:#10121c;--line:#232640;--txt:#eef0ff;--mut:#868bb0;--a:#8b5cff;--b:#2fb4ff}
+:root{--bg:#07070a;--card:#121014;--line:#2d2415;--txt:#f6efe2;--mut:#9a8d76;--a:#f5a524;--b:#ffd98a}
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
-body{margin:0;background:radial-gradient(900px 500px at 50% -10%,#2a1660 0%,transparent 60%),var(--bg);color:var(--txt);font-family:'Space Grotesk',system-ui,sans-serif;min-height:100vh;padding:16px 16px 92px}
+body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,transparent 62%),var(--bg);color:var(--txt);font-family:'Space Grotesk',system-ui,sans-serif;min-height:100vh;padding:16px 16px 92px}
 .top{display:flex;justify-content:space-between;align-items:center}
-.logo{font-weight:700;font-size:20px;letter-spacing:.5px;display:flex;gap:8px;align-items:center}
-.lvl{background:linear-gradient(90deg,var(--a),var(--b));padding:5px 12px;border-radius:99px;font-size:13px;font-weight:700}
-.bal{text-align:center;margin:26px 0 6px}
-.bal b{font-size:46px;font-weight:700;background:linear-gradient(180deg,#fff,#b9a6ff);-webkit-background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
-.bal small{display:block;color:var(--mut);margin-top:2px}
-.stage{display:grid;place-items:center;height:300px;position:relative}
-#rat{width:230px;height:230px;border-radius:50%;border:2px solid #5b3fd6;color:#fff;font:700 62px 'Space Grotesk';letter-spacing:4px;cursor:pointer;
-background:radial-gradient(circle at 35% 28%,#a98bff,#4a22c9 55%,#1a0b57);box-shadow:0 0 60px #7b4dff88,inset 0 -16px 40px #0008,inset 0 10px 30px #fff3;transition:transform .08s}
-#rat:active{transform:scale(.94)}
-#rat:disabled{filter:grayscale(.85) brightness(.6);box-shadow:none;cursor:not-allowed}
-.float{position:absolute;font-weight:700;color:#cdbdff;pointer-events:none;animation:up .9s ease-out forwards}
+.logo{font-weight:700;font-size:20px;letter-spacing:.5px;display:flex;gap:10px;align-items:center}
+.logo img{width:34px;height:34px;border-radius:50%;box-shadow:0 0 14px #f5a52466}
+.lvl{background:linear-gradient(90deg,var(--a),var(--b));color:#1a1204;padding:5px 12px;border-radius:99px;font-size:13px;font-weight:700}
+.bal{text-align:center;margin:20px 0 4px}
+.bal b{font-size:48px;font-weight:700;background:linear-gradient(180deg,#fff7e0,var(--a));-webkit-background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
+.bal small{display:block;color:var(--mut);margin-top:2px;font-size:14px}
+.total{text-align:center;color:var(--b);font-size:15px;font-variant-numeric:tabular-nums}
+.stage{display:grid;place-items:center;height:290px;position:relative}
+.ring{width:252px;height:252px;border-radius:50%;padding:7px;background:conic-gradient(var(--a) var(--p,0%),#2a2012 0);box-shadow:0 0 70px #f5a52440}
+#rat{width:100%;height:100%;border-radius:50%;border:0;padding:0;background:#000;cursor:pointer;overflow:hidden;display:block;transition:transform .08s}
+#rat img{width:100%;height:100%;display:block;pointer-events:none}
+#rat:active{transform:scale(.95)}
+#rat:disabled{filter:grayscale(.9) brightness(.55);cursor:not-allowed}
+.float{position:absolute;font-weight:700;color:var(--b);pointer-events:none;animation:up .9s ease-out forwards}
 @keyframes up{to{transform:translateY(-110px);opacity:0}}
-.bar{height:12px;background:var(--card);border:1px solid var(--line);border-radius:99px;overflow:hidden}
-.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--a),var(--b));width:100%;transition:width .15s}
-.row{display:flex;justify-content:space-between;color:var(--mut);font-size:13px;margin:8px 2px 0}
-.cd{text-align:center;margin-top:14px;font-size:15px;color:var(--b);min-height:22px;font-variant-numeric:tabular-nums}
+.row{display:flex;justify-content:space-between;color:var(--mut);font-size:13px;margin:6px 2px 0}
+.cd{text-align:center;margin-top:14px;font-size:16px;color:var(--b);min-height:22px;font-variant-numeric:tabular-nums}
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
 .card h3{margin:0 0 4px;font-size:17px}.card p{margin:0 0 12px;color:var(--mut);font-size:14px}
-.btn{width:100%;border:0;border-radius:12px;padding:14px;font:700 15px 'Space Grotesk';color:#fff;background:linear-gradient(90deg,var(--a),var(--b));cursor:pointer}
-.btn.ghost{background:transparent;border:1px solid var(--line)}
-.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0b0d16ee;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
+.btn{width:100%;border:0;border-radius:12px;padding:14px;font:700 15px 'Space Grotesk';color:#1a1204;background:linear-gradient(90deg,var(--a),var(--b));cursor:pointer}
+.btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
+.tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0b0a0dee;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
 .tabs button{flex:1;background:none;border:0;color:var(--mut);font:500 12px 'Space Grotesk';display:grid;gap:3px;justify-items:center;cursor:pointer;padding:4px}
-.tabs button.on{color:#fff}.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabs button.on{color:var(--a)}.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tab{display:none}.tab.on{display:block}
 .stat{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}.stat:last-child{border:0}
 @media(prefers-reduced-motion:reduce){.float{animation:none;opacity:0}}
 </style></head><body>
-<div class="top"><div class="logo">🐀 RATCOIN</div><div class="lvl" id="lvl">Level 0</div></div>
+<div class="top"><div class="logo"><img src="logo.png" alt="">RATCOIN</div><div class="lvl" id="lvl">Level 0</div></div>
 
 <section class="tab on" id="t-tap">
- <div class="bal"><b id="bal">15.00000</b><small>RAT balance</small></div>
- <div class="stage"><button id="rat">RAT</button></div>
- <div class="bar"><i id="en"></i></div>
- <div class="row"><span>⚡ Energy <span id="enT"></span></span><span>+0.01000 per tap</span></div>
+ <div class="bal"><b id="mine">0.00000</b><small>Mined this round</small></div>
+ <div class="stage"><div class="ring" id="ring"><button id="rat"><img src="logo.png" alt="RAT"></button></div></div>
+ <div class="row"><span>Taps <span id="tapsT"></span></span><span id="perT"></span></div>
  <div class="cd" id="cd"></div>
+ <div class="total" style="margin-top:10px">Balance: <b id="bal">15.00000</b> RAT</div>
 </section>
 
 <section class="tab" id="t-boost">
  <div class="card"><h3>⚡ Upgrade level</h3><p id="boostInfo"></p>
   <button class="btn" id="buy">Buy next level</button></div>
- <div class="card"><div class="stat"><span>Energy per cycle</span><b id="sCap"></b></div>
-  <div class="stat"><span>Refill time</span><b>45:00</b></div>
+ <div class="card"><div class="stat"><span>Reward per round</span><b id="sCap"></b></div>
+  <div class="stat"><span>Taps per round</span><b>1000</b></div>
+  <div class="stat"><span>Cooldown</span><b>45:00</b></div>
   <div class="stat"><span>Next level cost</span><b id="sCost"></b></div></div>
 </section>
 
@@ -74,56 +76,60 @@ background:radial-gradient(circle at 35% 28%,#a98bff,#4a22c9 55%,#1a0b57);box-sh
 <script>
 const WALLET="UQDjtUFRElZPY4_git8O5MGq6YcYwty2CH6QfyYtKuAAh_6t";
 const BOT="RATCOINMINING_BOT";
-const TAP=0.01, COOL=45*60*1000, BASE_CAP=100, PRICE=n=>0.5*n;
-const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#06070c"); tg?.setBackgroundColor?.("#06070c");
-const uid=tg?.initDataUnsafe?.user?.id||"local", KEY="ratcoin_"+uid;
-let S={bal:15,level:0,energy:BASE_CAP,cool:0,friends:0};
+const UNIT=1e5, TAPS=1000, COOL=45*60*1000, PRICE=n=>0.5*n;
+const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#07070a"); tg?.setBackgroundColor?.("#07070a");
+const uid=tg?.initDataUnsafe?.user?.id||"local", KEY="ratcoin2_"+uid;
+let S={bal:15*UNIT,level:0,taps:0,cool:0,friends:0};
 try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
-const cap=()=>BASE_CAP+150*S.level, $=id=>document.getElementById(id);
+const per=()=>1+S.level, $=id=>document.getElementById(id), fmt=n=>(n/UNIT).toFixed(5);
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 
-const icons={tap:'<path d="M12 3c4 0 7 3 7 7s-3 11-7 11-7-7-7-11 3-7 7-7z"/><path d="M9 10h.01M15 10h.01"/>',boost:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',friends:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6M17 11a3 3 0 1 0 0-6M18 14c2.5.5 4 2.5 4 5"/>',wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/>'};
+const icons={tap:'<circle cx="12" cy="12" r="9"/><path d="M9.5 16V8h3.2a2.4 2.4 0 0 1 0 4.8H9.5M12.8 12.8 15.5 16"/>',boost:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',friends:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6M17 11a3 3 0 1 0 0-6M18 14c2.5.5 4 2.5 4 5"/>',wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/>'};
 const names={tap:"Tap",boost:"Boost",friends:"Friends",wallet:"Wallet"};
 Object.keys(icons).forEach((k,i)=>{const b=document.createElement("button");b.innerHTML=`<svg viewBox="0 0 24 24">${icons[k]}</svg>${names[k]}`;if(!i)b.className="on";
  b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b))};$("nav").append(b)});
 
 function render(){
  const left=S.cool-Date.now();
- if(S.cool&&left<=0){S.cool=0;S.energy=cap();save()}
- $("bal").textContent=S.bal.toFixed(5); $("lvl").textContent="Level "+S.level;
- $("en").style.width=(S.energy/cap()*100)+"%"; $("enT").textContent=S.energy+"/"+cap();
+ if(S.cool&&left<=0){S.cool=0;S.taps=0;save()}
+ $("mine").textContent=fmt(S.taps*per());
+ $("bal").textContent=fmt(S.bal);
+ $("lvl").textContent="Level "+S.level;
+ $("ring").style.setProperty("--p",(S.taps/TAPS*100)+"%");
+ $("tapsT").textContent=S.taps+"/"+TAPS;
+ $("perT").textContent="+"+fmt(per())+" per tap";
  $("rat").disabled=!!S.cool;
- if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next taps in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else $("cd").textContent="";
- $("boostInfo").textContent=`Level ${S.level+1} costs ${PRICE(S.level+1).toFixed(2)} TON and raises your energy to ${BASE_CAP+150*(S.level+1)} taps.`;
- $("sCap").textContent=cap()+" taps"; $("sCost").textContent=PRICE(S.level+1).toFixed(2)+" TON";
+ if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else $("cd").textContent="";
+ $("boostInfo").textContent=`Level ${S.level+1} costs ${PRICE(S.level+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*(S.level+2))} RAT per round.`;
+ $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sCost").textContent=PRICE(S.level+1).toFixed(2)+" TON";
  $("fr").textContent=S.friends; $("fe").textContent=(S.friends*5)+" RAT";
 }
 $("rat").onclick=e=>{
- if(S.cool||S.energy<=0)return;
- S.energy--; S.bal=Math.round((S.bal+TAP)*1e5)/1e5;
+ if(S.cool||S.taps>=TAPS)return;
+ S.taps++; S.bal+=per();
  tg?.HapticFeedback?.impactOccurred("light");
- const f=document.createElement("div");f.className="float";f.textContent="+0.01000";
- const p=$("rat").parentElement.getBoundingClientRect();
- f.style.left=(e.clientX-p.left-30)+"px";f.style.top=(e.clientY-p.top-20)+"px";$("rat").parentElement.append(f);setTimeout(()=>f.remove(),900);
- if(S.energy<=0)S.cool=Date.now()+COOL;
+ const f=document.createElement("div");f.className="float";f.textContent="+"+fmt(per());
+ const p=$("rat").closest(".stage").getBoundingClientRect();
+ f.style.left=(e.clientX-p.left-35)+"px";f.style.top=(e.clientY-p.top-20)+"px";$("rat").closest(".stage").append(f);setTimeout(()=>f.remove(),900);
+ if(S.taps>=TAPS)S.cool=Date.now()+COOL;
  save();render();
 };
 setInterval(render,1000);
 
 let ui=null;
-try{ui=new TON_CONNECT_UI.TonConnectUI({manifestUrl:new URL("tonconnect-manifest.json",location.href).href,buttonRootId:"ton"});
+try{ui=new TON_CONNECT_UI.TonConnectUI({manifestUrl:new URL("tonconnect-manifest.json",location.href).href,buttonRootId:"ton",actionsConfiguration:{twaReturnUrl:"https://t.me/"+BOT}});
  ui.onStatusChange(w=>{$("ws").textContent=w?"Connected":"Not connected"})}catch(e){}
 $("buy").onclick=async()=>{
  if(!ui?.connected){tg?.showAlert?.("Connect your wallet first.");document.querySelectorAll("#nav button")[3].click();return}
  const n=S.level+1, nano=String(Math.round(PRICE(n)*1e9));
  try{
   await ui.sendTransaction({validUntil:Math.floor(Date.now()/1000)+600,messages:[{address:WALLET,amount:nano}]});
-  S.level=n;S.energy=cap();S.cool=0;save();render();tg?.showAlert?.("Level "+n+" unlocked!");
- }catch(e){tg?.showAlert?.("Payment cancelled.")}
+  S.level=n;S.taps=0;S.cool=0;save();render();tg?.showAlert?.("Level "+n+" unlocked!");
+ }catch(e){tg?.showAlert?.("Payment failed: "+(e?.message||e))}
 };
 
 const link=`https://t.me/${BOT}?start=ref_${uid}`;
-$("inv").onclick=()=>{const u="https://t.me/share/url?url="+encodeURIComponent(link)+"&text="+encodeURIComponent("Tap the RAT and earn RATCOIN 🐀");tg?tg.openTelegramLink(u):window.open(u)};
+$("inv").onclick=()=>{const u="https://t.me/share/url?url="+encodeURIComponent(link)+"&text="+encodeURIComponent("Tap RAT and earn RATCOIN!");tg?tg.openTelegramLink(u):window.open(u)};
 $("cp").onclick=()=>{navigator.clipboard?.writeText(link);tg?.showAlert?.("Link copied.")};
 render();
 </script></body></html>
