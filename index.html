@@ -45,7 +45,7 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
  <div class="stage"><div class="ring" id="ring"><button id="rat"><img src="logo.png" alt="RAT"></button></div></div>
  <div class="row"><span>Taps <span id="tapsT"></span></span><span id="perT"></span></div>
  <div class="cd" id="cd"></div>
- <div class="total" style="margin-top:10px">Balance: <b id="bal">15.00000</b> RAT</div>
+ <div class="total" style="margin-top:10px">Balance: <b id="bal">0.00000</b> RAT</div>
 </section>
 
 <section class="tab" id="t-boost">
@@ -74,58 +74,83 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 <nav class="tabs" id="nav"></nav>
 
 <script>
+const API="https://YOUR-SERVER-URL"; // paste your Railway domain here, no trailing slash
 const WALLET="UQDjtUFRElZPY4_git8O5MGq6YcYwty2CH6QfyYtKuAAh_6t";
 const BOT="RATCOINMINING_BOT";
 const UNIT=1e5, TAPS=1000, COOL=45*60*1000, PRICE=n=>0.5*n;
 const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#07070a"); tg?.setBackgroundColor?.("#07070a");
-const uid=tg?.initDataUnsafe?.user?.id||"local", KEY="ratcoin2_"+uid;
-let S={bal:15*UNIT,level:0,taps:0,cool:0,friends:0};
-try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
+const initData=tg?.initData||"", uid=tg?.initDataUnsafe?.user?.id||"";
+let S={bal:0,level:0,taps:0,coolEnd:0,friends:0,ready:false}, pending=0, sent=0, busy=false, reloading=false;
 const per=()=>1+S.level, $=id=>document.getElementById(id), fmt=n=>(n/UNIT).toFixed(5);
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+
+async function api(path,body){
+ try{const r=await fetch(API+path,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({initData,...body})});return await r.json()}
+ catch(e){return {ok:false,error:"Network error"}}
+}
+function apply(d){
+ if(!d||!d.ok||!d.user)return false;
+ const u=d.user; S.bal=u.bal;S.level=u.level;S.taps=u.taps;S.friends=u.friends;
+ S.coolEnd=u.coolLeft?Date.now()+u.coolLeft:0; S.ready=true; return true;
+}
+async function load(){const d=await api("/api/me",{});if(!apply(d))$("cd").textContent=d.error||"Cannot connect";render()}
 
 const icons={tap:'<circle cx="12" cy="12" r="9"/><path d="M9.5 16V8h3.2a2.4 2.4 0 0 1 0 4.8H9.5M12.8 12.8 15.5 16"/>',boost:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',friends:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6M17 11a3 3 0 1 0 0-6M18 14c2.5.5 4 2.5 4 5"/>',wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/>'};
 const names={tap:"Tap",boost:"Boost",friends:"Friends",wallet:"Wallet"};
 Object.keys(icons).forEach((k,i)=>{const b=document.createElement("button");b.innerHTML=`<svg viewBox="0 0 24 24">${icons[k]}</svg>${names[k]}`;if(!i)b.className="on";
- b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b))};$("nav").append(b)});
+ b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b));if(k=="friends")load()};$("nav").append(b)});
 
 function render(){
- const left=S.cool-Date.now();
- if(S.cool&&left<=0){S.cool=0;S.taps=0;save()}
- $("mine").textContent=fmt(S.taps*per());
- $("bal").textContent=fmt(S.bal);
+ const left=S.coolEnd-Date.now(), extra=sent+pending, taps=Math.min(TAPS,S.taps+extra);
+ if(S.ready&&S.coolEnd&&left<=0&&!reloading){reloading=true;load().then(()=>reloading=false)}
+ $("mine").textContent=fmt(taps*per());
+ $("bal").textContent=fmt(S.bal+extra*per());
  $("lvl").textContent="Level "+S.level;
- $("ring").style.setProperty("--p",(S.taps/TAPS*100)+"%");
- $("tapsT").textContent=S.taps+"/"+TAPS;
+ $("ring").style.setProperty("--p",(taps/TAPS*100)+"%");
+ $("tapsT").textContent=taps+"/"+TAPS;
  $("perT").textContent="+"+fmt(per())+" per tap";
- $("rat").disabled=!!S.cool;
- if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else $("cd").textContent="";
+ $("rat").disabled=!S.ready||(S.coolEnd&&left>0);
+ if(S.coolEnd&&left>0){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else if(S.ready)$("cd").textContent="";
  $("boostInfo").textContent=`Level ${S.level+1} costs ${PRICE(S.level+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*(S.level+2))} RAT per round.`;
  $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sCost").textContent=PRICE(S.level+1).toFixed(2)+" TON";
  $("fr").textContent=S.friends; $("fe").textContent=(S.friends*5)+" RAT";
 }
+async function flush(){
+ if(busy||!pending)return; busy=true; sent=pending; pending=0;
+ const d=await api("/api/tap",{n:sent}); sent=0; busy=false; apply(d); render();
+}
+setInterval(flush,1200); setInterval(render,1000);
 $("rat").onclick=e=>{
- if(S.cool||S.taps>=TAPS)return;
- S.taps++; S.bal+=per();
- tg?.HapticFeedback?.impactOccurred("light");
+ if(!S.ready||S.coolEnd>Date.now()||S.taps+sent+pending>=TAPS)return;
+ pending++; tg?.HapticFeedback?.impactOccurred("light");
  const f=document.createElement("div");f.className="float";f.textContent="+"+fmt(per());
- const p=$("rat").closest(".stage").getBoundingClientRect();
- f.style.left=(e.clientX-p.left-35)+"px";f.style.top=(e.clientY-p.top-20)+"px";$("rat").closest(".stage").append(f);setTimeout(()=>f.remove(),900);
- if(S.taps>=TAPS)S.cool=Date.now()+COOL;
- save();render();
+ const st=$("rat").closest(".stage"),p=st.getBoundingClientRect();
+ f.style.left=(e.clientX-p.left-35)+"px";f.style.top=(e.clientY-p.top-20)+"px";st.append(f);setTimeout(()=>f.remove(),900);
+ if(S.taps+sent+pending>=TAPS){S.coolEnd=Date.now()+COOL;flush()}
+ render();
 };
-setInterval(render,1000);
 
 let ui=null;
 try{ui=new TON_CONNECT_UI.TonConnectUI({manifestUrl:new URL("tonconnect-manifest.json",location.href).href,buttonRootId:"ton",actionsConfiguration:{twaReturnUrl:"https://t.me/"+BOT}});
  ui.onStatusChange(w=>{$("ws").textContent=w?"Connected":"Not connected"})}catch(e){}
+function commentPayload(text){
+ const t=Array.from(new TextEncoder().encode(text)), data=[0,0,0,0,...t];
+ const cell=[0,data.length*2,...data];
+ return btoa(String.fromCharCode(0xb5,0xee,0x9c,0x72,1,1,1,1,0,cell.length,0,...cell));
+}
 $("buy").onclick=async()=>{
  if(!ui?.connected){tg?.showAlert?.("Connect your wallet first.");document.querySelectorAll("#nav button")[3].click();return}
- const n=S.level+1, nano=String(Math.round(PRICE(n)*1e9));
+ const n=S.level+1, nano=String(Math.round(PRICE(n)*1e9)), label=$("buy").textContent;
  try{
-  await ui.sendTransaction({validUntil:Math.floor(Date.now()/1000)+600,messages:[{address:WALLET,amount:nano}]});
-  S.level=n;S.taps=0;S.cool=0;save();render();tg?.showAlert?.("Level "+n+" unlocked!");
- }catch(e){tg?.showAlert?.("Payment failed: "+(e?.message||e))}
+  await ui.sendTransaction({validUntil:Math.floor(Date.now()/1000)+600,messages:[{address:WALLET,amount:nano,payload:commentPayload(`rc:${uid}:${n}`)}]});
+ }catch(e){tg?.showAlert?.("Payment failed: "+(e?.message||e));return}
+ $("buy").disabled=true;$("buy").textContent="Confirming payment...";
+ for(let i=0;i<45;i++){
+  const d=await api("/api/buy",{level:n});
+  if(d.ok&&!d.pending&&d.user&&d.user.level>=n){apply(d);render();tg?.showAlert?.("Level "+n+" unlocked!");break}
+  if(i==44)tg?.showAlert?.("Payment not confirmed yet. Reopen the app in a few minutes.");
+  await new Promise(r=>setTimeout(r,4000));
+ }
+ $("buy").disabled=false;$("buy").textContent=label;
 };
 
 const link=`https://t.me/${BOT}?start=ref_${uid}`;
@@ -135,5 +160,5 @@ $("inv").onclick=()=>{
  tg?tg.openTelegramLink(u):window.open(u);
 };
 $("cp").onclick=()=>{navigator.clipboard?.writeText(link);tg?.showAlert?.("Link copied.")};
-render();
+$("cd").textContent="Loading..."; load();
 </script></body></html>
