@@ -57,11 +57,13 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 <section class="tab" id="t-boost">
  <div class="card"><h3>🖐🏻 Multitap</h3><p id="mtInfo"></p>
   <button class="btn" id="buyMt">Buy Multitap</button></div>
+ <div class="card"><h3>⏱ Cooldown</h3><p id="cdInfo"></p>
+  <button class="btn" id="buyCd">Reduce cooldown</button></div>
  <div class="card"><h3>⛏️ Bot mining</h3><p id="botInfo"></p>
   <div id="botBtns"></div></div>
  <div class="card"><div class="stat"><span>Reward per round</span><b id="sCap"></b></div>
-  <div class="stat"><span>Taps per round</span><b>1000</b></div>
-  <div class="stat"><span>Cooldown</span><b>45:00</b></div>
+  <div class="stat"><span>Taps per round</span><b id="sTaps"></b></div>
+  <div class="stat"><span>Cooldown</span><b id="sCool"></b></div>
   <div class="stat"><span>Multitap level</span><b id="sMt"></b></div>
   <div class="stat"><span>Next Multitap cost</span><b id="sCost"></b></div>
   <div class="stat"><span>Bot mining</span><b id="sBot"></b></div></div>
@@ -88,12 +90,19 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 <script>
 const WALLET="UQDjtUFRElZPY4_git8O5MGq6YcYwty2CH6QfyYtKuAAh_6t";
 const BOT="RATCOINMINING_BOT";
-const UNIT=1e5, TAPS=1000, COOL=45*60*1000, DAY=24*60*60*1000;
+const UNIT=1e5, DAY=24*60*60*1000;
+const TAPS=500;                    // taps per round
+
+// Cooldown between rounds (minutes) by Cooldown level 0..4. Min = 40 minutes.
+const COOL_STEPS=[60,55,50,45,40];
+const CD_PRICES=[0.20,0.35,0.55,0.80];   // TON for Cooldown levels 1..4 (total 1.90 TON)
+const MAX_CD=CD_PRICES.length;
+const CD_PRICE=n=>CD_PRICES[n-1];
 
 // Reward per tap = TAP_RAT x (1 + Multitap level).
-// Tuned so a fully active player (32 manual rounds/day + Bot mining always on, Multitap 10)
-// reaches Level 400 in about 2 years:  64 rounds x 1000 taps x 0.68 x 11 = ~478,700 RAT/day.
-const TAP_RAT=0.68;
+// Base cooldown (60 min): 48 rounds/day (24 manual + 24 bot) x 500 taps x 0.81 x 11 = ~213,800 RAT/day -> ~4.5 years to Level 400.
+// Min cooldown (40 min):  72 rounds/day (36 manual + 36 bot) -> ~320,800 RAT/day -> ~3 years to Level 400.
+const TAP_RAT=0.81;
 
 // Multitap prices (TON) for levels 1..10  (total 6.50 TON)
 const MT_PRICES=[0.10,0.15,0.20,0.30,0.40,0.55,0.75,1.00,1.30,1.75];
@@ -113,10 +122,13 @@ const fmtR=n=>n.toLocaleString("en-US");
 
 const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#07070a"); tg?.setBackgroundColor?.("#07070a");
 const uid=tg?.initDataUnsafe?.user?.id||"local", KEY="ratcoin2_"+uid;
-let S={bal:15*UNIT,mt:0,taps:0,cool:0,friends:0,bot:0,botLast:0,botAcc:0};
+let S={bal:15*UNIT,mt:0,cd:0,taps:0,cool:0,friends:0,bot:0,botLast:0,botAcc:0};
 try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
 if(S.level!==undefined){S.mt=S.mt||S.level;delete S.level}   // migrate old saves
 S.mt=Math.min(S.mt,MAX_MT);
+S.cd=Math.min(Math.max(0,S.cd||0),MAX_CD);
+if(S.taps>TAPS)S.taps=TAPS;
+const coolFor=n=>COOL_STEPS[n]*60000, coolMs=()=>coolFor(S.cd);
 const perFor=n=>Math.round(TAP_RAT*UNIT*(1+n)), per=()=>perFor(S.mt);
 const $=id=>document.getElementById(id);
 const fmt=n=>{const v=n/UNIT;return v>=1000?v.toLocaleString("en-US",{maximumFractionDigits:0}):v>=1?v.toFixed(2):v.toFixed(5)};
@@ -138,13 +150,13 @@ const names={tap:"Tap",boost:"Boost",friends:"Friends",wallet:"Wallet"};
 Object.keys(icons).forEach((k,i)=>{const b=document.createElement("button");b.innerHTML=`<svg viewBox="0 0 24 24">${icons[k]}</svg>${names[k]}`;if(!i)b.className="on";
  b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b));if(k==="friends")scrollRank()};$("nav").append(b)});
 
-// Bot mining: earns the same as one full round (1000 taps) per 45 minutes, automatically.
+// Bot mining: earns the same as one full round per cooldown period, automatically.
 // Also catches up on time spent with the app closed.
 function accrueBot(){
  if(!S.bot)return;
  const now=Date.now(), t=Math.min(now,S.bot), dt=t-S.botLast;
  if(dt>0){
-  S.botAcc+=dt/1000*(TAPS*per()/(COOL/1000));
+  S.botAcc+=dt/1000*(TAPS*per()/(coolMs()/1000));
   const whole=Math.floor(S.botAcc);
   if(whole>0){S.bal+=whole;S.botAcc-=whole}
   S.botLast=t; save();
@@ -194,10 +206,16 @@ function render(){
  $("mtInfo").textContent=mtMax?`Maximum level reached (${MAX_MT}/${MAX_MT}).`:`Level ${S.mt+1} of ${MAX_MT} costs ${MT_PRICE(S.mt+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*perFor(S.mt+1))} RAT per round.`;
  $("buyMt").disabled=mtMax;
  $("buyMt").textContent=mtMax?"Max level ✅":"Buy Multitap · "+MT_PRICE(S.mt+1).toFixed(2)+" TON";
+ // Cooldown
+ const cdMax=S.cd>=MAX_CD;
+ $("cdInfo").textContent=cdMax?`Minimum cooldown reached (${COOL_STEPS[S.cd]} min).`:`Cut the cooldown from ${COOL_STEPS[S.cd]} to ${COOL_STEPS[S.cd+1]} min. Up to ${(1440/COOL_STEPS[S.cd+1]).toFixed(1)} rounds per day. Level ${S.cd+1} of ${MAX_CD}.`;
+ $("buyCd").disabled=cdMax;
+ $("buyCd").textContent=cdMax?"Min cooldown ✅":"Reduce to "+COOL_STEPS[S.cd+1]+" min · "+CD_PRICE(S.cd+1).toFixed(2)+" TON";
  // Bot
  const botOn=S.bot>Date.now();
  $("botInfo").textContent=botOn?`Bot is mining for you ⛏️ Time left: ${hms(S.bot-Date.now())}. Buy a pack to extend it.`:"A bot mines for you automatically, even when the app is closed. Pick a pack:";
  $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sMt").textContent=S.mt+"/"+MAX_MT;
+ $("sTaps").textContent=TAPS; $("sCool").textContent=p2(COOL_STEPS[S.cd])+":00";
  $("sCost").textContent=mtMax?"—":MT_PRICE(S.mt+1).toFixed(2)+" TON";
  $("sBot").textContent=botOn?hms(S.bot-Date.now()):"Inactive";
  $("fr").textContent=S.friends;
@@ -210,7 +228,7 @@ $("rat").onclick=e=>{
  const f=document.createElement("div");f.className="float";f.textContent="+"+fmt(per());
  const p=$("rat").closest(".stage").getBoundingClientRect();
  f.style.left=(e.clientX-p.left-35)+"px";f.style.top=(e.clientY-p.top-20)+"px";$("rat").closest(".stage").append(f);setTimeout(()=>f.remove(),900);
- if(S.taps>=TAPS)S.cool=Date.now()+COOL;
+ if(S.taps>=TAPS)S.cool=Date.now()+coolMs();
  save();render();
 };
 setInterval(render,1000);
@@ -230,7 +248,18 @@ async function pay(ton,onOk){
 $("buyMt").onclick=()=>{
  if(S.mt>=MAX_MT)return;
  const n=S.mt+1;
- pay(MT_PRICE(n),()=>{S.mt=n;S.taps=0;S.cool=0;tg?.showAlert?.("Multitap level "+n+" unlocked!")});
+ pay(MT_PRICE(n),()=>{accrueBot();S.mt=n;S.taps=0;S.cool=0;tg?.showAlert?.("Multitap level "+n+" unlocked!")});
+};
+$("buyCd").onclick=()=>{
+ if(S.cd>=MAX_CD)return;
+ const n=S.cd+1;
+ pay(CD_PRICE(n),()=>{
+  accrueBot();
+  const diff=coolMs()-coolFor(n);
+  S.cd=n;
+  if(S.cool)S.cool=Math.max(Date.now(),S.cool-diff);   // shorten a cooldown already running
+  tg?.showAlert?.("Cooldown is now "+COOL_STEPS[n]+" minutes!");
+ });
 };
 
 // Bot pack buttons
@@ -251,7 +280,7 @@ BOT_PACKS.forEach((k,i)=>{
 
 const link=`https://t.me/${BOT}?start=ref_${uid}`;
 $("inv").onclick=()=>{
- const txt=" RATCOIN: tap-to-mine on TON!\n⏱ 1000 taps per round, a new round every 45 minutes\n⚡ Level up with TON to boost your rewards\n🎁 Get 15 RAT free when you join\n\nJoin with my link 👇";
+ const txt=` RATCOIN: tap-to-mine on TON!\n⏱ ${TAPS} taps per round, boost your cooldown with TON\n⚡ Level up with TON to boost your rewards\n🎁 Get 15 RAT free when you join\n\nJoin with my link 👇`;
  const u="https://t.me/share/url?url="+encodeURIComponent(link)+"&text="+encodeURIComponent(txt);
  tg?tg.openTelegramLink(u):window.open(u);
 };
