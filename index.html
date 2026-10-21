@@ -14,7 +14,7 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 .logo img{width:34px;height:34px;border-radius:50%;box-shadow:0 0 14px #f5a52466}
 .lvl{background:linear-gradient(90deg,var(--a),var(--b));color:#1a1204;padding:5px 12px;border-radius:99px;font-size:13px;font-weight:700}
 .bal{text-align:center;margin:20px 0 4px}
-.bal b{font-size:48px;font-weight:700;background:linear-gradient(180deg,#fff7e0,var(--a));-webkit-background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
+.bal b{font-size:clamp(28px,9vw,44px);font-weight:700;background:linear-gradient(180deg,#fff7e0,var(--a));-webkit-background-clip:text;color:transparent;font-variant-numeric:tabular-nums}
 .bal small{display:block;color:var(--mut);margin-top:2px;font-size:14px}
 .total{text-align:center;color:var(--b);font-size:15px;font-variant-numeric:tabular-nums}
 .stage{display:grid;place-items:center;height:290px;position:relative}
@@ -51,7 +51,7 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
  <div class="stage"><div class="ring" id="ring"><button id="rat"><img src="logo.png" alt="RAT"></button></div></div>
  <div class="row"><span>Taps <span id="tapsT"></span></span><span id="perT"></span></div>
  <div class="cd" id="cd"></div>
- <div class="total" style="margin-top:10px">Balance: <b id="bal">15.00000</b> RAT</div>
+ <div class="total" style="margin-top:10px">Balance: <b id="bal">15.00</b> RAT</div>
 </section>
 
 <section class="tab" id="t-boost">
@@ -89,6 +89,11 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 const WALLET="UQDjtUFRElZPY4_git8O5MGq6YcYwty2CH6QfyYtKuAAh_6t";
 const BOT="RATCOINMINING_BOT";
 const UNIT=1e5, TAPS=1000, COOL=45*60*1000;
+
+// Reward per tap = TAP_RAT x (1 + Multitap level).
+// Tuned so a fully active player (32 manual rounds/day + Bot mining always on, Multitap 10)
+// reaches Level 400 in about 2 years:  64 rounds x 1000 taps x 0.68 x 11 = ~478,700 RAT/day.
+const TAP_RAT=0.68;
 const MT_PRICE=n=>0.30*n;          // Multitap: 0.30 TON x level number
 const MAX_MT=10;                   // Multitap max level
 const BOT_PRICE=0.50;              // Bot mining: 0.50 TON
@@ -96,8 +101,8 @@ const BOT_DURATION=24*60*60*1000;  // 24 hours
 
 // Rank levels: Level 1 = 20 RAT ... Level 400 = 350,000,000 RAT (smooth curve)
 const MAX_RANK=400;
-const FIRST_RANK_RAT=20;           // RAT needed for Level 1
-const TOP_RANK_RAT=350000000;      // RAT needed for Level 400
+const FIRST_RANK_RAT=20;
+const TOP_RANK_RAT=350000000;
 const RANK_POW=Math.log(TOP_RANK_RAT/FIRST_RANK_RAT)/Math.log(MAX_RANK);
 const rankRat=n=>n>=MAX_RANK?TOP_RANK_RAT:n<=0?0:Math.round(FIRST_RANK_RAT*Math.pow(n,RANK_POW));
 const fmtR=n=>n.toLocaleString("en-US");
@@ -108,7 +113,9 @@ let S={bal:15*UNIT,mt:0,taps:0,cool:0,friends:0,bot:0,botLast:0,botAcc:0};
 try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
 if(S.level!==undefined){S.mt=S.mt||S.level;delete S.level}   // migrate old saves
 S.mt=Math.min(S.mt,MAX_MT);
-const per=()=>1+S.mt, $=id=>document.getElementById(id), fmt=n=>(n/UNIT).toFixed(5);
+const perFor=n=>Math.round(TAP_RAT*UNIT*(1+n)), per=()=>perFor(S.mt);
+const $=id=>document.getElementById(id);
+const fmt=n=>{const v=n/UNIT;return v>=1000?v.toLocaleString("en-US",{maximumFractionDigits:0}):v>=1?v.toFixed(2):v.toFixed(5)};
 const rank=()=>{
  const r=S.bal/UNIT;
  if(r>=TOP_RANK_RAT)return MAX_RANK;
@@ -178,7 +185,7 @@ function render(){
  if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else $("cd").textContent="";
  // Multitap
  const mtMax=S.mt>=MAX_MT;
- $("mtInfo").textContent=mtMax?`Maximum level reached (${MAX_MT}/${MAX_MT}).`:`Level ${S.mt+1} of ${MAX_MT} costs ${MT_PRICE(S.mt+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*(S.mt+2))} RAT per round.`;
+ $("mtInfo").textContent=mtMax?`Maximum level reached (${MAX_MT}/${MAX_MT}).`:`Level ${S.mt+1} of ${MAX_MT} costs ${MT_PRICE(S.mt+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*perFor(S.mt+1))} RAT per round.`;
  $("buyMt").disabled=mtMax;
  $("buyMt").textContent=mtMax?"Max level ✅":"Buy Multitap · "+MT_PRICE(S.mt+1).toFixed(2)+" TON";
  // Bot
