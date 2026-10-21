@@ -58,7 +58,7 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
  <div class="card"><h3>🖐🏻 Multitap</h3><p id="mtInfo"></p>
   <button class="btn" id="buyMt">Buy Multitap</button></div>
  <div class="card"><h3>⛏️ Bot mining</h3><p id="botInfo"></p>
-  <button class="btn" id="buyBot">Buy Bot mining</button></div>
+  <div id="botBtns"></div></div>
  <div class="card"><div class="stat"><span>Reward per round</span><b id="sCap"></b></div>
   <div class="stat"><span>Taps per round</span><b>1000</b></div>
   <div class="stat"><span>Cooldown</span><b>45:00</b></div>
@@ -88,16 +88,20 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 <script>
 const WALLET="UQDjtUFRElZPY4_git8O5MGq6YcYwty2CH6QfyYtKuAAh_6t";
 const BOT="RATCOINMINING_BOT";
-const UNIT=1e5, TAPS=1000, COOL=45*60*1000;
+const UNIT=1e5, TAPS=1000, COOL=45*60*1000, DAY=24*60*60*1000;
 
 // Reward per tap = TAP_RAT x (1 + Multitap level).
 // Tuned so a fully active player (32 manual rounds/day + Bot mining always on, Multitap 10)
 // reaches Level 400 in about 2 years:  64 rounds x 1000 taps x 0.68 x 11 = ~478,700 RAT/day.
 const TAP_RAT=0.68;
-const MT_PRICE=n=>0.30*n;          // Multitap: 0.30 TON x level number
-const MAX_MT=10;                   // Multitap max level
-const BOT_PRICE=0.50;              // Bot mining: 0.50 TON
-const BOT_DURATION=24*60*60*1000;  // 24 hours
+
+// Multitap prices (TON) for levels 1..10  (total 6.50 TON)
+const MT_PRICES=[0.10,0.15,0.20,0.30,0.40,0.55,0.75,1.00,1.30,1.75];
+const MAX_MT=MT_PRICES.length;
+const MT_PRICE=n=>MT_PRICES[n-1];
+
+// Bot mining packs. Buying while active extends the remaining time.
+const BOT_PACKS=[{d:1,p:0.15},{d:7,p:0.90},{d:30,p:3.00}];
 
 // Rank levels: Level 1 = 20 RAT ... Level 400 = 350,000,000 RAT (smooth curve)
 const MAX_RANK=400;
@@ -125,14 +129,16 @@ const rank=()=>{
  return n;
 };
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
-const hms=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(s/3600)).padStart(2,"0")+":"+String(Math.floor(s%3600/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")};
+const p2=n=>String(n).padStart(2,"0");
+const hms=ms=>{const s=Math.max(0,Math.ceil(ms/1000)),d=Math.floor(s/86400),r=s%86400;
+ return (d?d+"d ":"")+p2(Math.floor(r/3600))+":"+p2(Math.floor(r%3600/60))+":"+p2(r%60)};
 
 const icons={tap:'<circle cx="12" cy="12" r="9"/><path d="M9.5 16V8h3.2a2.4 2.4 0 0 1 0 4.8H9.5M12.8 12.8 15.5 16"/>',boost:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',friends:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6M17 11a3 3 0 1 0 0-6M18 14c2.5.5 4 2.5 4 5"/>',wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/>'};
 const names={tap:"Tap",boost:"Boost",friends:"Friends",wallet:"Wallet"};
 Object.keys(icons).forEach((k,i)=>{const b=document.createElement("button");b.innerHTML=`<svg viewBox="0 0 24 24">${icons[k]}</svg>${names[k]}`;if(!i)b.className="on";
  b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b));if(k==="friends")scrollRank()};$("nav").append(b)});
 
-// Bot mining: earns the same as one full round (1000 taps) per 45 minutes, automatically, for 24h.
+// Bot mining: earns the same as one full round (1000 taps) per 45 minutes, automatically.
 // Also catches up on time spent with the app closed.
 function accrueBot(){
  if(!S.bot)return;
@@ -182,7 +188,7 @@ function render(){
  $("tapsT").textContent=S.taps+"/"+TAPS;
  $("perT").textContent="+"+fmt(per())+" per tap";
  $("rat").disabled=!!S.cool;
- if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else $("cd").textContent="";
+ if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+p2(Math.floor(s/60))+":"+p2(s%60)}else $("cd").textContent="";
  // Multitap
  const mtMax=S.mt>=MAX_MT;
  $("mtInfo").textContent=mtMax?`Maximum level reached (${MAX_MT}/${MAX_MT}).`:`Level ${S.mt+1} of ${MAX_MT} costs ${MT_PRICE(S.mt+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*perFor(S.mt+1))} RAT per round.`;
@@ -190,8 +196,7 @@ function render(){
  $("buyMt").textContent=mtMax?"Max level ✅":"Buy Multitap · "+MT_PRICE(S.mt+1).toFixed(2)+" TON";
  // Bot
  const botOn=S.bot>Date.now();
- $("botInfo").textContent=botOn?`Bot is mining for you. Time left: ${hms(S.bot-Date.now())}`:`A bot mines for you automatically for 24 hours, even when the app is closed. Cost: ${BOT_PRICE.toFixed(2)} TON.`;
- $("buyBot").disabled=botOn; $("buyBot").textContent=botOn?"Bot is active ⛏️":"Buy Bot mining · "+BOT_PRICE.toFixed(2)+" TON";
+ $("botInfo").textContent=botOn?`Bot is mining for you ⛏️ Time left: ${hms(S.bot-Date.now())}. Buy a pack to extend it.`:"A bot mines for you automatically, even when the app is closed. Pick a pack:";
  $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sMt").textContent=S.mt+"/"+MAX_MT;
  $("sCost").textContent=mtMax?"—":MT_PRICE(S.mt+1).toFixed(2)+" TON";
  $("sBot").textContent=botOn?hms(S.bot-Date.now()):"Inactive";
@@ -227,10 +232,22 @@ $("buyMt").onclick=()=>{
  const n=S.mt+1;
  pay(MT_PRICE(n),()=>{S.mt=n;S.taps=0;S.cool=0;tg?.showAlert?.("Multitap level "+n+" unlocked!")});
 };
-$("buyBot").onclick=()=>{
- if(S.bot>Date.now())return;
- pay(BOT_PRICE,()=>{const now=Date.now();S.bot=now+BOT_DURATION;S.botLast=now;S.botAcc=0;tg?.showAlert?.("Bot mining started for 24 hours!")});
-};
+
+// Bot pack buttons
+BOT_PACKS.forEach((k,i)=>{
+ const disc=Math.round((1-k.p/(k.d*BOT_PACKS[0].p))*100);
+ const b=document.createElement("button");
+ b.className="btn"+(i?" ghost":"");
+ if(i)b.style.marginTop="10px";
+ b.textContent=(k.d===1?"24 hours":k.d+" days")+" · "+k.p.toFixed(2)+" TON"+(disc>0?" (-"+disc+"%)":"");
+ b.onclick=()=>pay(k.p,()=>{
+  const now=Date.now();
+  if(S.bot>now){S.bot+=k.d*DAY}
+  else{S.bot=now+k.d*DAY;S.botLast=now;S.botAcc=0}
+  tg?.showAlert?.("Bot mining active for "+(k.d===1?"24 hours":k.d+" days")+"!");
+ });
+ $("botBtns").append(b);
+});
 
 const link=`https://t.me/${BOT}?start=ref_${uid}`;
 $("inv").onclick=()=>{
