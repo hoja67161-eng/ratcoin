@@ -30,12 +30,17 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-top:14px}
 .card h3{margin:0 0 4px;font-size:17px}.card p{margin:0 0 12px;color:var(--mut);font-size:14px}
 .btn{width:100%;border:0;border-radius:12px;padding:14px;font:700 15px 'Space Grotesk';color:#1a1204;background:linear-gradient(90deg,var(--a),var(--b));cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
 .btn.ghost{background:transparent;color:var(--txt);border:1px solid var(--line)}
 .tabs{position:fixed;left:0;right:0;bottom:0;display:flex;background:#0b0a0dee;backdrop-filter:blur(10px);border-top:1px solid var(--line);padding:8px 8px calc(8px + env(safe-area-inset-bottom,0px))}
 .tabs button{flex:1;background:none;border:0;color:var(--mut);font:500 12px 'Space Grotesk';display:grid;gap:3px;justify-items:center;cursor:pointer;padding:4px}
 .tabs button.on{color:var(--a)}.tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .tab{display:none}.tab.on{display:block}
 .stat{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}.stat:last-child{border:0}
+.bar{height:10px;border-radius:99px;background:#2a2012;overflow:hidden;margin:4px 0 12px}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));transition:width .3s}
+.lv.done{color:var(--b)}.lv.cur{color:var(--a);font-weight:700}.lv.lock{color:var(--mut)}
+.badge{display:inline-block;margin-left:6px;font-size:12px;color:#1a1204;background:linear-gradient(90deg,var(--a),var(--b));padding:2px 8px;border-radius:99px;font-weight:700;vertical-align:middle}
 @media(prefers-reduced-motion:reduce){.float{animation:none;opacity:0}}
 </style></head><body>
 <div class="top"><div class="logo"><img src="logo.png" alt="">RATCOIN</div><div class="lvl" id="lvl">Level 0</div></div>
@@ -49,12 +54,16 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 </section>
 
 <section class="tab" id="t-boost">
- <div class="card"><h3>⚡ Upgrade level</h3><p id="boostInfo"></p>
-  <button class="btn" id="buy">Buy next level</button></div>
+ <div class="card"><h3>🖐🏻 Multitap</h3><p id="mtInfo"></p>
+  <button class="btn" id="buyMt">Buy Multitap</button></div>
+ <div class="card"><h3>⛏️ Bot mining</h3><p id="botInfo"></p>
+  <button class="btn" id="buyBot">Buy Bot mining</button></div>
  <div class="card"><div class="stat"><span>Reward per round</span><b id="sCap"></b></div>
   <div class="stat"><span>Taps per round</span><b>1000</b></div>
   <div class="stat"><span>Cooldown</span><b>45:00</b></div>
-  <div class="stat"><span>Next level cost</span><b id="sCost"></b></div></div>
+  <div class="stat"><span>Multitap level</span><b id="sMt"></b></div>
+  <div class="stat"><span>Next Multitap cost</span><b id="sCost"></b></div>
+  <div class="stat"><span>Bot mining</span><b id="sBot"></b></div></div>
 </section>
 
 <section class="tab" id="t-friends">
@@ -63,10 +72,13 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
   <button class="btn ghost" id="cp" style="margin-top:10px">Copy link</button></div>
  <div class="card"><div class="stat"><span>Friends invited</span><b id="fr">0</b></div>
   <div class="stat"><span>Referral earnings</span><b id="fe">0 RAT</b></div></div>
+ <div class="card"><h3>🏆 Levels</h3><p id="rkInfo"></p>
+  <div class="bar"><i id="rkBar"></i></div>
+  <div id="rkList"></div></div>
 </section>
 
 <section class="tab" id="t-wallet">
- <div class="card"><h3>👛 TON wallet</h3><p>Connect your wallet to buy levels with TON.</p><div id="ton"></div>
+ <div class="card"><h3>👛 TON wallet</h3><p>Connect your wallet to buy upgrades with TON.</p><div id="ton"></div>
   <div class="stat" style="margin-top:12px"><span>Status</span><b id="ws">Not connected</b></div></div>
  <div class="card"><h3>Withdraw</h3><p>Withdrawals open after the RAT listing.</p><button class="btn ghost" disabled>Coming soon</button></div>
 </section>
@@ -76,33 +88,74 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 <script>
 const WALLET="UQDjtUFRElZPY4_git8O5MGq6YcYwty2CH6QfyYtKuAAh_6t";
 const BOT="RATCOINMINING_BOT";
-const UNIT=1e5, TAPS=1000, COOL=45*60*1000, PRICE=n=>0.5*n;
+const UNIT=1e5, TAPS=1000, COOL=45*60*1000;
+const MT_PRICE=n=>0.30*n;          // Multitap: 0.30 TON x level number
+const BOT_PRICE=0.50;              // Bot mining: 0.50 TON
+const BOT_DURATION=24*60*60*1000;  // 24 hours
+const RANK_STEP=20;                // every 20 RAT = +1 rank level
 const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#07070a"); tg?.setBackgroundColor?.("#07070a");
 const uid=tg?.initDataUnsafe?.user?.id||"local", KEY="ratcoin2_"+uid;
-let S={bal:15*UNIT,level:0,taps:0,cool:0,friends:0};
+let S={bal:15*UNIT,mt:0,taps:0,cool:0,friends:0,bot:0,botLast:0,botAcc:0};
 try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
-const per=()=>1+S.level, $=id=>document.getElementById(id), fmt=n=>(n/UNIT).toFixed(5);
+if(S.level!==undefined){S.mt=S.mt||S.level;delete S.level}   // migrate old saves
+const per=()=>1+S.mt, $=id=>document.getElementById(id), fmt=n=>(n/UNIT).toFixed(5);
+const rank=()=>Math.floor(S.bal/(RANK_STEP*UNIT));
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
+const hms=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(s/3600)).padStart(2,"0")+":"+String(Math.floor(s%3600/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")};
 
 const icons={tap:'<circle cx="12" cy="12" r="9"/><path d="M9.5 16V8h3.2a2.4 2.4 0 0 1 0 4.8H9.5M12.8 12.8 15.5 16"/>',boost:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',friends:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6M17 11a3 3 0 1 0 0-6M18 14c2.5.5 4 2.5 4 5"/>',wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/>'};
 const names={tap:"Tap",boost:"Boost",friends:"Friends",wallet:"Wallet"};
 Object.keys(icons).forEach((k,i)=>{const b=document.createElement("button");b.innerHTML=`<svg viewBox="0 0 24 24">${icons[k]}</svg>${names[k]}`;if(!i)b.className="on";
  b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b))};$("nav").append(b)});
 
+// Bot mining: earns the same as one full round (1000 taps) per 45 minutes, automatically, for 24h.
+// Also catches up on time spent with the app closed.
+function accrueBot(){
+ if(!S.bot)return;
+ const now=Date.now(), t=Math.min(now,S.bot), dt=t-S.botLast;
+ if(dt>0){
+  S.botAcc+=dt/1000*(TAPS*per()/(COOL/1000));
+  const whole=Math.floor(S.botAcc);
+  if(whole>0){S.bal+=whole;S.botAcc-=whole}
+  S.botLast=t; save();
+ }
+ if(now>=S.bot){S.bot=0;S.botLast=0;S.botAcc=0;save()}
+}
+
+function renderRanks(){
+ const r=rank(), next=(r+1)*RANK_STEP, prog=(S.bal/UNIT-r*RANK_STEP)/RANK_STEP*100;
+ $("rkInfo").textContent=`You are Level ${r}. Reach ${next} RAT to become Level ${r+1}.`;
+ $("rkBar").style.width=Math.min(100,Math.max(0,prog))+"%";
+ const max=Math.max(10,r+3); let h="";
+ for(let n=1;n<=max;n++){
+  const cls=n<r?"done":n===r?"cur":"lock", ic=n<=r?"✅":"🔒";
+  h+=`<div class="stat lv ${cls}"><span>${ic} Level ${n}${n===r?'<span class="badge">You</span>':''}</span><b>${n*RANK_STEP} RAT</b></div>`;
+ }
+ if($("rkList").dataset.h!==h){$("rkList").innerHTML=h;$("rkList").dataset.h=h}
+}
+
 function render(){
+ accrueBot();
  const left=S.cool-Date.now();
  if(S.cool&&left<=0){S.cool=0;S.taps=0;save()}
  $("mine").textContent=fmt(S.taps*per());
  $("bal").textContent=fmt(S.bal);
- $("lvl").textContent="Level "+S.level;
+ $("lvl").textContent="Level "+rank();
  $("ring").style.setProperty("--p",(S.taps/TAPS*100)+"%");
  $("tapsT").textContent=S.taps+"/"+TAPS;
  $("perT").textContent="+"+fmt(per())+" per tap";
  $("rat").disabled=!!S.cool;
  if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else $("cd").textContent="";
- $("boostInfo").textContent=`Level ${S.level+1} costs ${PRICE(S.level+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*(S.level+2))} RAT per round.`;
- $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sCost").textContent=PRICE(S.level+1).toFixed(2)+" TON";
+ // Boost
+ $("mtInfo").textContent=`Level ${S.mt+1} costs ${MT_PRICE(S.mt+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*(S.mt+2))} RAT per round.`;
+ const botOn=S.bot>Date.now();
+ $("botInfo").textContent=botOn?`Bot is mining for you. Time left: ${hms(S.bot-Date.now())}`:`A bot mines for you automatically for 24 hours, even when the app is closed. Cost: ${BOT_PRICE.toFixed(2)} TON.`;
+ $("buyBot").disabled=botOn; $("buyBot").textContent=botOn?"Bot is active ⛏️":"Buy Bot mining · "+BOT_PRICE.toFixed(2)+" TON";
+ $("buyMt").textContent="Buy Multitap · "+MT_PRICE(S.mt+1).toFixed(2)+" TON";
+ $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sMt").textContent=S.mt; $("sCost").textContent=MT_PRICE(S.mt+1).toFixed(2)+" TON";
+ $("sBot").textContent=botOn?hms(S.bot-Date.now()):"Inactive";
  $("fr").textContent=S.friends; $("fe").textContent=(S.friends*5)+" RAT";
+ renderRanks();
 }
 $("rat").onclick=e=>{
  if(S.cool||S.taps>=TAPS)return;
@@ -119,13 +172,22 @@ setInterval(render,1000);
 let ui=null;
 try{ui=new TON_CONNECT_UI.TonConnectUI({manifestUrl:new URL("tonconnect-manifest.json",location.href).href,buttonRootId:"ton",actionsConfiguration:{twaReturnUrl:"https://t.me/"+BOT}});
  ui.onStatusChange(w=>{$("ws").textContent=w?"Connected":"Not connected"})}catch(e){}
-$("buy").onclick=async()=>{
+
+async function pay(ton,onOk){
  if(!ui?.connected){tg?.showAlert?.("Connect your wallet first.");document.querySelectorAll("#nav button")[3].click();return}
- const n=S.level+1, nano=String(Math.round(PRICE(n)*1e9));
+ const nano=String(Math.round(ton*1e9));
  try{
   await ui.sendTransaction({validUntil:Math.floor(Date.now()/1000)+600,messages:[{address:WALLET,amount:nano}]});
-  S.level=n;S.taps=0;S.cool=0;save();render();tg?.showAlert?.("Level "+n+" unlocked!");
+  onOk();save();render();
  }catch(e){tg?.showAlert?.("Payment failed: "+(e?.message||e))}
+}
+$("buyMt").onclick=()=>{
+ const n=S.mt+1;
+ pay(MT_PRICE(n),()=>{S.mt=n;S.taps=0;S.cool=0;tg?.showAlert?.("Multitap level "+n+" unlocked!")});
+};
+$("buyBot").onclick=()=>{
+ if(S.bot>Date.now())return;
+ pay(BOT_PRICE,()=>{const now=Date.now();S.bot=now+BOT_DURATION;S.botLast=now;S.botAcc=0;tg?.showAlert?.("Bot mining started for 24 hours!")});
 };
 
 const link=`https://t.me/${BOT}?start=ref_${uid}`;
