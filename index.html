@@ -39,6 +39,7 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 .stat{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--line);font-size:15px}.stat:last-child{border:0}
 .bar{height:10px;border-radius:99px;background:#2a2012;overflow:hidden;margin:4px 0 12px}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--a),var(--b));transition:width .3s}
+#rkList{max-height:320px;overflow-y:auto;position:relative;-webkit-overflow-scrolling:touch}
 .lv.done{color:var(--b)}.lv.cur{color:var(--a);font-weight:700}.lv.lock{color:var(--mut)}
 .badge{display:inline-block;margin-left:6px;font-size:12px;color:#1a1204;background:linear-gradient(90deg,var(--a),var(--b));padding:2px 8px;border-radius:99px;font-weight:700;vertical-align:middle}
 @media(prefers-reduced-motion:reduce){.float{animation:none;opacity:0}}
@@ -67,11 +68,10 @@ body{margin:0;background:radial-gradient(900px 520px at 50% -8%,#3b2708 0%,trans
 </section>
 
 <section class="tab" id="t-friends">
- <div class="card"><h3>👥 Invite friends</h3><p>Earn 5 RAT for every friend who joins with your link.</p>
+ <div class="card"><h3>👥 Invite friends</h3><p>Invite your friends to join RATCOIN with your link.</p>
   <button class="btn" id="inv">Share invite link</button>
   <button class="btn ghost" id="cp" style="margin-top:10px">Copy link</button></div>
- <div class="card"><div class="stat"><span>Friends invited</span><b id="fr">0</b></div>
-  <div class="stat"><span>Referral earnings</span><b id="fe">0 RAT</b></div></div>
+ <div class="card"><div class="stat"><span>Friends invited</span><b id="fr">0</b></div></div>
  <div class="card"><h3>🏆 Levels</h3><p id="rkInfo"></p>
   <div class="bar"><i id="rkBar"></i></div>
   <div id="rkList"></div></div>
@@ -90,23 +90,40 @@ const WALLET="UQDjtUFRElZPY4_git8O5MGq6YcYwty2CH6QfyYtKuAAh_6t";
 const BOT="RATCOINMINING_BOT";
 const UNIT=1e5, TAPS=1000, COOL=45*60*1000;
 const MT_PRICE=n=>0.30*n;          // Multitap: 0.30 TON x level number
+const MAX_MT=10;                   // Multitap max level
 const BOT_PRICE=0.50;              // Bot mining: 0.50 TON
 const BOT_DURATION=24*60*60*1000;  // 24 hours
-const RANK_STEP=20;                // every 20 RAT = +1 rank level
+
+// Rank levels: Level 1 = 20 RAT ... Level 400 = 350,000,000 RAT (smooth curve)
+const MAX_RANK=400;
+const FIRST_RANK_RAT=20;           // RAT needed for Level 1
+const TOP_RANK_RAT=350000000;      // RAT needed for Level 400
+const RANK_POW=Math.log(TOP_RANK_RAT/FIRST_RANK_RAT)/Math.log(MAX_RANK);
+const rankRat=n=>n>=MAX_RANK?TOP_RANK_RAT:n<=0?0:Math.round(FIRST_RANK_RAT*Math.pow(n,RANK_POW));
+const fmtR=n=>n.toLocaleString("en-US");
+
 const tg=window.Telegram?.WebApp; tg?.ready(); tg?.expand(); tg?.setHeaderColor?.("#07070a"); tg?.setBackgroundColor?.("#07070a");
 const uid=tg?.initDataUnsafe?.user?.id||"local", KEY="ratcoin2_"+uid;
 let S={bal:15*UNIT,mt:0,taps:0,cool:0,friends:0,bot:0,botLast:0,botAcc:0};
 try{Object.assign(S,JSON.parse(localStorage.getItem(KEY)||"{}"))}catch(e){}
 if(S.level!==undefined){S.mt=S.mt||S.level;delete S.level}   // migrate old saves
+S.mt=Math.min(S.mt,MAX_MT);
 const per=()=>1+S.mt, $=id=>document.getElementById(id), fmt=n=>(n/UNIT).toFixed(5);
-const rank=()=>Math.floor(S.bal/(RANK_STEP*UNIT));
+const rank=()=>{
+ const r=S.bal/UNIT;
+ if(r>=TOP_RANK_RAT)return MAX_RANK;
+ let n=Math.min(MAX_RANK,Math.floor(Math.pow(r/FIRST_RANK_RAT,1/RANK_POW)));
+ while(n<MAX_RANK&&r>=rankRat(n+1))n++;
+ while(n>0&&r<rankRat(n))n--;
+ return n;
+};
 const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}};
 const hms=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return String(Math.floor(s/3600)).padStart(2,"0")+":"+String(Math.floor(s%3600/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")};
 
 const icons={tap:'<circle cx="12" cy="12" r="9"/><path d="M9.5 16V8h3.2a2.4 2.4 0 0 1 0 4.8H9.5M12.8 12.8 15.5 16"/>',boost:'<path d="M13 2 4 14h7l-1 8 9-12h-7z"/>',friends:'<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.5 3-6 6.5-6s6.5 2.5 6.5 6M17 11a3 3 0 1 0 0-6M18 14c2.5.5 4 2.5 4 5"/>',wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/>'};
 const names={tap:"Tap",boost:"Boost",friends:"Friends",wallet:"Wallet"};
 Object.keys(icons).forEach((k,i)=>{const b=document.createElement("button");b.innerHTML=`<svg viewBox="0 0 24 24">${icons[k]}</svg>${names[k]}`;if(!i)b.className="on";
- b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b))};$("nav").append(b)});
+ b.onclick=()=>{document.querySelectorAll(".tab").forEach(t=>t.classList.toggle("on",t.id=="t-"+k));[...$("nav").children].forEach(c=>c.classList.toggle("on",c===b));if(k==="friends")scrollRank()};$("nav").append(b)});
 
 // Bot mining: earns the same as one full round (1000 taps) per 45 minutes, automatically, for 24h.
 // Also catches up on time spent with the app closed.
@@ -122,16 +139,29 @@ function accrueBot(){
  if(now>=S.bot){S.bot=0;S.botLast=0;S.botAcc=0;save()}
 }
 
+let rkBuilt=-1;
+function scrollRank(){
+ const c=document.querySelector("#rkList .cur"), box=$("rkList");
+ if(c&&box.offsetParent)box.scrollTop=Math.max(0,c.offsetTop-60);
+}
 function renderRanks(){
- const r=rank(), next=(r+1)*RANK_STEP, prog=(S.bal/UNIT-r*RANK_STEP)/RANK_STEP*100;
- $("rkInfo").textContent=`You are Level ${r}. Reach ${next} RAT to become Level ${r+1}.`;
- $("rkBar").style.width=Math.min(100,Math.max(0,prog))+"%";
- const max=Math.max(10,r+3); let h="";
- for(let n=1;n<=max;n++){
-  const cls=n<r?"done":n===r?"cur":"lock", ic=n<=r?"✅":"🔒";
-  h+=`<div class="stat lv ${cls}"><span>${ic} Level ${n}${n===r?'<span class="badge">You</span>':''}</span><b>${n*RANK_STEP} RAT</b></div>`;
+ const r=rank();
+ if(r>=MAX_RANK){
+  $("rkInfo").textContent=`You reached the maximum level ${MAX_RANK} 🏆`;
+  $("rkBar").style.width="100%";
+ }else{
+  const cur=rankRat(r), next=rankRat(r+1), prog=(S.bal/UNIT-cur)/(next-cur)*100;
+  $("rkInfo").textContent=`You are Level ${r}. Reach ${fmtR(next)} RAT to become Level ${r+1}.`;
+  $("rkBar").style.width=Math.min(100,Math.max(0,prog))+"%";
  }
- if($("rkList").dataset.h!==h){$("rkList").innerHTML=h;$("rkList").dataset.h=h}
+ if(rkBuilt!==r){   // rebuild the list only when the level changes
+  let h="";
+  for(let n=1;n<=MAX_RANK;n++){
+   const cls=n<r?"done":n===r?"cur":"lock", ic=n<=r?"✅":"🔒";
+   h+=`<div class="stat lv ${cls}"><span>${ic} Level ${n}${n===r?'<span class="badge">You</span>':''}</span><b>${fmtR(rankRat(n))} RAT</b></div>`;
+  }
+  $("rkList").innerHTML=h; rkBuilt=r; scrollRank();
+ }
 }
 
 function render(){
@@ -146,15 +176,19 @@ function render(){
  $("perT").textContent="+"+fmt(per())+" per tap";
  $("rat").disabled=!!S.cool;
  if(S.cool){const s=Math.ceil(left/1000);$("cd").textContent="Next round in "+String(Math.floor(s/60)).padStart(2,"0")+":"+String(s%60).padStart(2,"0")}else $("cd").textContent="";
- // Boost
- $("mtInfo").textContent=`Level ${S.mt+1} costs ${MT_PRICE(S.mt+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*(S.mt+2))} RAT per round.`;
+ // Multitap
+ const mtMax=S.mt>=MAX_MT;
+ $("mtInfo").textContent=mtMax?`Maximum level reached (${MAX_MT}/${MAX_MT}).`:`Level ${S.mt+1} of ${MAX_MT} costs ${MT_PRICE(S.mt+1).toFixed(2)} TON and raises your reward to ${fmt(TAPS*(S.mt+2))} RAT per round.`;
+ $("buyMt").disabled=mtMax;
+ $("buyMt").textContent=mtMax?"Max level ✅":"Buy Multitap · "+MT_PRICE(S.mt+1).toFixed(2)+" TON";
+ // Bot
  const botOn=S.bot>Date.now();
  $("botInfo").textContent=botOn?`Bot is mining for you. Time left: ${hms(S.bot-Date.now())}`:`A bot mines for you automatically for 24 hours, even when the app is closed. Cost: ${BOT_PRICE.toFixed(2)} TON.`;
  $("buyBot").disabled=botOn; $("buyBot").textContent=botOn?"Bot is active ⛏️":"Buy Bot mining · "+BOT_PRICE.toFixed(2)+" TON";
- $("buyMt").textContent="Buy Multitap · "+MT_PRICE(S.mt+1).toFixed(2)+" TON";
- $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sMt").textContent=S.mt; $("sCost").textContent=MT_PRICE(S.mt+1).toFixed(2)+" TON";
+ $("sCap").textContent=fmt(TAPS*per())+" RAT"; $("sMt").textContent=S.mt+"/"+MAX_MT;
+ $("sCost").textContent=mtMax?"—":MT_PRICE(S.mt+1).toFixed(2)+" TON";
  $("sBot").textContent=botOn?hms(S.bot-Date.now()):"Inactive";
- $("fr").textContent=S.friends; $("fe").textContent=(S.friends*5)+" RAT";
+ $("fr").textContent=S.friends;
  renderRanks();
 }
 $("rat").onclick=e=>{
@@ -182,6 +216,7 @@ async function pay(ton,onOk){
  }catch(e){tg?.showAlert?.("Payment failed: "+(e?.message||e))}
 }
 $("buyMt").onclick=()=>{
+ if(S.mt>=MAX_MT)return;
  const n=S.mt+1;
  pay(MT_PRICE(n),()=>{S.mt=n;S.taps=0;S.cool=0;tg?.showAlert?.("Multitap level "+n+" unlocked!")});
 };
